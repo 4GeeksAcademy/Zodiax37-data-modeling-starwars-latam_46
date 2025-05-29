@@ -18,7 +18,6 @@ class User(db.Model):
     email: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
     password: Mapped[str] = mapped_column(nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean(), nullable=False)
-
     favorites: Mapped[list["Favorite"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
     def serialize(self):
@@ -72,12 +71,11 @@ class Favorite(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False)
     type: Mapped[FavoriteType] = mapped_column(Enum(FavoriteType), nullable=False)
-
+    character_id: Mapped[int] = mapped_column(ForeignKey("character.id"), nullable=True)
+    planet_id: Mapped[int] = mapped_column(ForeignKey("planet.id"), nullable=True)
     user: Mapped["User"] = relationship(back_populates="favorites")
-
-    # Relaciones uno a uno con las tablas específicas
-    character_detail: Mapped["FavoriteCharacter"] = relationship("FavoriteCharacter", uselist=False, back_populates="favorite", cascade="all, delete-orphan")
-    planet_detail: Mapped["FavoritePlanet"] = relationship("FavoritePlanet", uselist=False, back_populates="favorite", cascade="all, delete-orphan")
+    character: Mapped["Character"] = relationship()
+    planet: Mapped["Planet"] = relationship()
 
     def serialize(self):
         data = {
@@ -85,40 +83,11 @@ class Favorite(db.Model):
             "user_id": self.user_id,
             "type": self.type.value,
         }
-        if self.type == FavoriteType.character and self.character_detail:
-            data["character"] = self.character_detail.character.serialize()
-        elif self.type == FavoriteType.planet and self.planet_detail:
-            data["planet"] = self.planet_detail.planet.serialize()
+        if self.type == FavoriteType.character and self.character:
+            data["character"] = self.character.serialize()
+        elif self.type == FavoriteType.planet and self.planet:
+            data["planet"] = self.planet.serialize()
         return data
 
 
-class FavoriteCharacter(db.Model):
-    __tablename__ = "favorite_character"
 
-    id: Mapped[int] = mapped_column(ForeignKey("favorite.id"), primary_key=True)
-    character_id: Mapped[int] = mapped_column(ForeignKey("character.id"), nullable=False)
-
-    favorite: Mapped["Favorite"] = relationship(back_populates="character_detail")
-    character: Mapped["Character"] = relationship()
-
-    def serialize(self):
-        return {
-            "favorite_id": self.id,
-            "character": self.character.serialize()
-        }
-
-
-class FavoritePlanet(db.Model):
-    __tablename__ = "favorite_planet"
-
-    id: Mapped[int] = mapped_column(ForeignKey("favorite.id"), primary_key=True)
-    planet_id: Mapped[int] = mapped_column(ForeignKey("planet.id"), nullable=False)
-
-    favorite: Mapped["Favorite"] = relationship(back_populates="planet_detail")
-    planet: Mapped["Planet"] = relationship()
-
-    def serialize(self):
-        return {
-            "favorite_id": self.id,
-            "planet": self.planet.serialize()
-        }
